@@ -1,176 +1,86 @@
-const int c = 261;
-const int d = 294;
-const int e = 329;
-const int f = 349;
-const int g = 391;
-const int gS = 415;
-const int a = 440;
-const int aS = 455;
-const int b = 466;
-const int cH = 523;
-const int cSH = 554;
-const int dH = 587;
-const int dSH = 622;
-const int eH = 659;
-const int fH = 698;
-const int fSH = 740;
-const int gH = 784;
-const int gSH = 830;
-const int aH = 880;
+// Musical Notes
+const int c = 261, d = 294, e = 329, f = 349, g = 391, gS = 415, a = 440, aS = 455, b = 466, cH = 523, cSH = 554, dH = 587, dSH = 622, eH = 659, fH = 698, fSH = 740, gH = 784, gSH = 830, aH = 880;
 
-const int buzzerPin = 27; 
-const int ledPin1 = 12;  
-const int ledPin2 = 13; 
-const int buttonPin = 21; // Button connected to Pin 2 and GND
-
-int counter = 0;
+const int buzzerPin = 27; // Set to GPIO 27
+const int buttonPin = 21; // Set to GPIO 21
 
 // Speed Control Variables
-float speedMultiplier = 1.0;
-int speedStage = 3; // Start at Stage 3 (Normal Speed)
+volatile float speedMultiplier = 1.0;
+volatile int speedStage = 3; 
+volatile unsigned long lastButtonPress = 0;
+
+void IRAM_ATTR handleButton() {
+  unsigned long now = millis();
+  // 250ms Debounce
+  if (now - lastButtonPress > 250) {
+    speedStage++;
+    if (speedStage > 5) speedStage = 1;
+
+    if (speedStage == 1)      speedMultiplier = 1.50; // Slowest
+    else if (speedStage == 2) speedMultiplier = 1.25; 
+    else if (speedStage == 3) speedMultiplier = 1.00; // Normal
+    else if (speedStage == 4) speedMultiplier = 0.75; 
+    else if (speedStage == 5) speedMultiplier = 0.50; // Fastest
+    
+    lastButtonPress = now;
+  }
+}
 
 void setup() {
   pinMode(buzzerPin, OUTPUT);
-  pinMode(ledPin1, OUTPUT);
-  pinMode(ledPin2, OUTPUT);
-  
-  // Use INPUT_PULLUP to avoid needing an external resistor
   pinMode(buttonPin, INPUT_PULLUP); 
+
+  // Attach Interrupt: Note the IRAM_ATTR for ESP32 stability
+  attachInterrupt(digitalPinToInterrupt(buttonPin), handleButton, FALLING);
 }
 
 void loop() {
-  // Play the sequence
   firstSection();
   secondSection();
-
+  
   // Variant 1
-  beep(f, 250);  
-  beep(gS, 500);  
-  beep(f, 350);  
-  beep(a, 125);
-  beep(cH, 500);
-  beep(a, 375);  
-  beep(cH, 125);
-  beep(eH, 650);
-
+  beep(f, 250); beep(gS, 500); beep(f, 350); beep(a, 125);
+  beep(cH, 500); beep(a, 375); beep(cH, 125); beep(eH, 650);
   smartDelay(500);
 
   secondSection();
 
   // Variant 2
-  beep(f, 250);  
-  beep(gS, 500);  
-  beep(f, 375);  
-  beep(cH, 125);
-  beep(a, 500);  
-  beep(f, 375);  
-  beep(cH, 125);
-  beep(a, 650);  
-
+  beep(f, 250); beep(gS, 500); beep(f, 375); beep(cH, 125);
+  beep(a, 500); beep(f, 375); beep(cH, 125); beep(a, 650);
   smartDelay(650);
 }
 
-// Logic to cycle through 5 speed stages
-void checkButton() {
-  // If button is pressed (logic is LOW because of PULLUP)
-  if (digitalRead(buttonPin) == LOW) {
-    speedStage++;
-    if (speedStage > 5) speedStage = 1;
-
-    // Assign multipliers based on stage
-    switch (speedStage) {
-      case 1: speedMultiplier = 1.50; break; // Very Slow
-      case 2: speedMultiplier = 1.25; break; // Slow
-      case 3: speedMultiplier = 1.00; break; // Normal
-      case 4: speedMultiplier = 0.75; break; // Fast
-      case 5: speedMultiplier = 0.50; break; // Very Fast
-    }
-
-    // Visual feedback that speed changed
-    digitalWrite(ledPin1, HIGH);
-    digitalWrite(ledPin2, HIGH);
-    delay(200); 
-    digitalWrite(ledPin1, LOW);
-    digitalWrite(ledPin2, LOW);
-    
-    // Wait for button release (prevents rapid skipping)
-    while(digitalRead(buttonPin) == LOW);
-    delay(50); 
-  }
-}
-
-// Custom delay that stays responsive to the button
 void smartDelay(int ms) {
-  unsigned long start = millis();
-  while (millis() - start < (ms * speedMultiplier)) {
-    checkButton();
-  }
+  delay(ms * speedMultiplier);
 }
 
 void beep(int note, int duration) {
-  checkButton(); // Check for speed change before playing note
-  
   int adjDuration = duration * speedMultiplier;
-
+  
   tone(buzzerPin, note, adjDuration);
-
-  if(counter % 2 == 0) {
-    digitalWrite(ledPin1, HIGH);
-    delay(adjDuration);
-    digitalWrite(ledPin1, LOW);
-  } else {
-    digitalWrite(ledPin2, HIGH);
-    delay(adjDuration);
-    digitalWrite(ledPin2, LOW);
-  }
-
+  delay(adjDuration); 
+  
   noTone(buzzerPin);
-  delay(50 * speedMultiplier);
-  counter++;
+  delay(50 * speedMultiplier); 
 }
 
 void firstSection() {
-  beep(a, 500);
-  beep(a, 500);    
-  beep(a, 500);
-  beep(f, 350);
-  beep(cH, 150);  
-  beep(a, 500);
-  beep(f, 350);
-  beep(cH, 150);
-  beep(a, 650);
+  beep(a, 500); beep(a, 500); beep(a, 500); beep(f, 350); beep(cH, 150);
+  beep(a, 500); beep(f, 350); beep(cH, 150); beep(a, 650);
   smartDelay(500);
 
-  beep(eH, 500);
-  beep(eH, 500);
-  beep(eH, 500);  
-  beep(fH, 350);
-  beep(cH, 150);
-  beep(gS, 500);
-  beep(f, 350);
-  beep(cH, 150);
-  beep(a, 650);
+  beep(eH, 500); beep(eH, 500); beep(eH, 500); beep(fH, 350); beep(cH, 150);
+  beep(gS, 500); beep(f, 350); beep(cH, 150); beep(a, 650);
   smartDelay(500);
 }
 
 void secondSection() {
-  beep(aH, 500);
-  beep(a, 300);
-  beep(a, 150);
-  beep(aH, 500);
-  beep(gSH, 325);
-  beep(gH, 175);
-  beep(fSH, 125);
-  beep(fH, 125);    
-  beep(fSH, 250);
+  beep(aH, 500); beep(a, 300); beep(a, 150); beep(aH, 500); beep(gSH, 325);
+  beep(gH, 175); beep(fSH, 125); beep(fH, 125); beep(fSH, 250);
   smartDelay(325);
 
-  beep(aS, 250);
-  beep(dSH, 500);
-  beep(dH, 325);  
-  beep(cSH, 175);  
-  beep(cH, 125);  
-  beep(b, 125);  
-  beep(cH, 250);  
+  beep(aS, 250); beep(dSH, 500); beep(dH, 325); beep(cSH, 175);
+  beep(cH, 125); beep(b, 125); beep(cH, 250);
   smartDelay(350);
 }
